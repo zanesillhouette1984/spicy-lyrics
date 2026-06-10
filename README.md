@@ -28,3 +28,4 @@ I've seen a problem with the Spotify Lyrics. They're plain, just static colors. 
 
 
 *Inspired by [Beautiful Lyrics](https://github.com/surfbryce/beautiful-lyrics)*
+![Star History](http://localhost:3000/api/embed/emb_LhvzHYmGpdjB.svg)
