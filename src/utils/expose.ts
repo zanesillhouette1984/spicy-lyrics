@@ -6,6 +6,7 @@ import { OpenLyricsDBPanel } from "./openLyricsDBPanel";
 import { DeepFreeze } from "./utils";
 import { triggerSpicyLyricsFakeUpdate } from "./version/CheckForUpdates";
 import { BreakerDebug } from "./API/CircuitBreaker";
+import { PacerDebug } from "./API/RequestPacer";
 import { showUpdatedDialog } from "../components/ReactComponents/UpdateDialog.tsx";
 import GetProgress from "./Gets/GetProgress";
 
@@ -40,7 +41,8 @@ export function exposeToWindow() {
         request: {
             QueryAPI: {
                 breaker: BreakerDebug,
-            }
+            },
+            pacer: PacerDebug,
         }
     };
 

@@ -5,6 +5,7 @@ import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import PageView, { PageContainer } from "../../components/Pages/PageView.ts";
 import { Query, QueryHttpError, QueryNetworkError } from "../API/Query.ts";
 import { IsTripStatus, ServiceUnavailableError } from "../API/CircuitBreaker.ts";
+import { NoteRateLimited, WaitForTrackToSettle } from "../API/RequestPacer.ts";
 import { ProcessLyrics } from "./ProcessLyrics.ts";
 import { IsEmptyLyrics } from "./EmptyLines.ts";
 import Logger from "../Logger.ts";
@@ -70,6 +71,20 @@ export type FetchLyricsResult = [object | string, number, string?] | null;
 let inFlightUri: string | null = null;
 
 /**
+ * The sequence number of the fetch holding `inFlightUri`. A fetch only releases
+ * the slot if it still holds it: skipping A → B → A starts a second fetch for A
+ * while the first one is still settling, and the first finishing must not
+ * unlock the second.
+ */
+let inFlightSeq = 0;
+
+/** Bumped by every fetch that isn't de-duplicated. The newest one owns the network. */
+let latestRequestSeq = 0;
+
+/** The fetch currently waiting for its track to settle (see RequestPacer), or 0. */
+let settlingSeq = 0;
+
+/**
  * The uri of the most recent fetch request. Unlike `inFlightUri` this is never
  * cleared, so a fetch that finishes *after* the one that superseded it still
  * sees that it lost the race.
@@ -99,28 +114,39 @@ function hideLoaderFor(uri: string): void {
 
 export default async function fetchLyrics(uri: string): Promise<FetchLyricsResult> {
   if (inFlightUri === uri) {
+    // The fetch in flight may be waiting for the track to settle, which can
+    // outlast a view swap. The page asking now may be a new one, so give it the
+    // loading state too; the fetch in flight will paint over it.
+    if (settlingSeq !== 0 && settlingSeq === inFlightSeq && IsLyricsSkeletonEnabled()) {
+      ShowLyricsSkeleton();
+    }
     lyricsLogger.debug("Fetch already in flight for this track, skipping", uri);
     return null;
   }
 
+  const seq = ++latestRequestSeq;
   inFlightUri = uri;
+  inFlightSeq = seq;
   latestRequestedUri = uri;
   $currentlyFetching.set(true);
 
   try {
-    const result = await runFetchLyrics(uri);
+    const result = await runFetchLyrics(uri, seq);
     // Stamp the result with the uri it was requested for, so a late arrival can
     // be told apart from a result for the track that's playing now.
     return result ? [result[0], result[1], uri] : null;
   } finally {
     // Only release the lock if we still hold it — a newer fetch may have taken
-    // over while this one was awaiting.
-    if (inFlightUri === uri) inFlightUri = null;
-    $currentlyFetching.set(false);
+    // over while this one was awaiting, and is still fetching.
+    if (inFlightSeq === seq) {
+      inFlightUri = null;
+      inFlightSeq = 0;
+      $currentlyFetching.set(false);
+    }
   }
 }
 
-async function runFetchLyrics(uri: string): Promise<[object | string, number] | null> {
+async function runFetchLyrics(uri: string, seq: number): Promise<[object | string, number] | null> {
   lyricsLogger.debug("Fetch requested", uri);
   //if (!PageContainer) return;
   const LyricsContent =
@@ -248,6 +274,30 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
 
   ShowLoaderContainer(uri);
 
+  // Skipping through songs: hold the request until the user settles on this
+  // track, and drop it if they move on first (see RequestPacer). A newer fetch
+  // owns the loading state by then, so it is left alone.
+  settlingSeq = seq;
+  let settled: boolean;
+  try {
+    settled = await WaitForTrackToSettle(
+      uri,
+      () => seq !== latestRequestSeq || isStaleFetch(uri)
+    );
+  } finally {
+    if (settlingSeq === seq) settlingSeq = 0;
+  }
+  if (!settled) {
+    lyricsLogger.debug("Track changed before it settled, request dropped", uri);
+    return null;
+  }
+
+  if (!navigator.onLine) {
+    hideLoaderFor(uri);
+    $currentlyFetching.set(false);
+    return ["offline", 400];
+  }
+
   // Fetch new lyrics if no match in localStorage
   /* const lyricsApi = storage.get("customLyricsApi") ?? Defaults.LyricsContent.api.url;
     const lyricsAccessToken = storage.get("lyricsApiAccessToken") ?? Defaults.LyricsContent.api.accessToken; */
@@ -353,6 +403,7 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
       if (status === 429) {
         // The server's own per-query rate limit. (A *transport* 429 never gets
         // here — that trips the circuit breaker and throws.)
+        NoteRateLimited();
         hideLoaderFor(uri);
         $currentlyFetching.set(false);
         return ["rate-limited", 429];
@@ -418,7 +469,10 @@ async function runFetchLyrics(uri: string): Promise<[object | string, number] | 
     // to the user, so it gets the same wording.
     if (error instanceof QueryHttpError) {
       lyricsLogger.warn("Lyrics request refused", error.status);
-      if (error.status === 429) return ["rate-limited", 429];
+      if (error.status === 429) {
+        NoteRateLimited();
+        return ["rate-limited", 429];
+      }
       if (IsTripStatus(error.status)) return ["service-unavailable", error.status];
       return ["status-not-200", error.status];
     }

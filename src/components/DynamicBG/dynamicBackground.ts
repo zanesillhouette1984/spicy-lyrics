@@ -547,6 +547,9 @@ const getAudioAnalysisForTrack = async (uri: string): Promise<AudioAnalysisData 
 
   const request = getDynamicAudioAnalysis(uri)
     .then((analysis) => {
+      // undefined: skipped before it was requested. Caching that as "no
+      // analysis" would leave the track without one if the user comes back.
+      if (analysis === undefined) return null;
       audioAnalysisCache.set(uri, analysis);
       return analysis;
     })
@@ -645,14 +648,17 @@ Global.Event.listen("playback:progress", async (e) => {
   const requestUri = songUri;
 
   const audioAnalysisData = await getAudioAnalysisForTrack(requestUri);
-  if (!audioAnalysisData) {
-    resetDynamicBackgroundAnimationSpeed();
+
+  // Prevent stale async results from old tracks applying after rapid song
+  // switches — a missing analysis included, whose reset would knock the track
+  // now playing back to the default speed.
+  const currentUri = SpotifyPlayer.GetUri();
+  if (!currentUri || currentUri !== requestUri || latestPlaybackTrackUri !== requestUri) {
     return;
   }
 
-  // Prevent stale async results from old tracks applying after rapid song switches.
-  const currentUri = SpotifyPlayer.GetUri();
-  if (!currentUri || currentUri !== requestUri || latestPlaybackTrackUri !== requestUri) {
+  if (!audioAnalysisData) {
+    resetDynamicBackgroundAnimationSpeed();
     return;
   }
 

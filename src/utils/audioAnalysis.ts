@@ -1,5 +1,6 @@
 import type { AudioAnalysisData } from "../components/DynamicBG/BackgroundAnimationController";
 import { GetExpireStore } from "../modules/Store";
+import { WaitForTrackToSettle } from "./API/RequestPacer";
 
 interface CachedAudioAnalysis {
     analysis?: AudioAnalysisData;
@@ -38,9 +39,13 @@ function isAudioAnalysisData(data: unknown): data is AudioAnalysisData {
 /**
  * Gets and validates the Spotify audio analysis for a given track URI.
  * * @param uri The Spotify track URI (e.g., 'spotify:track:4uLU6hMCjMI75M1A2tKUQC')
- * @returns The parsed AudioAnalysisData, or null if the fetch fails
+ * @returns The parsed AudioAnalysisData, null if the fetch fails, or undefined if
+ * the track was skipped before it settled and nothing was requested (see
+ * RequestPacer) — a result that must not be cached as "no analysis".
  */
-export async function getDynamicAudioAnalysis(uri: string): Promise<AudioAnalysisData | null> {
+export async function getDynamicAudioAnalysis(
+    uri: string
+): Promise<AudioAnalysisData | null | undefined> {
     if (!uri) {
         return null;
     }
@@ -62,6 +67,12 @@ export async function getDynamicAudioAnalysis(uri: string): Promise<AudioAnalysi
     }
     if (cached?.analysis && isAudioAnalysisData(cached.analysis)) {
         return cached.analysis;
+    }
+
+    // An analysis is a large download to parse and store; skipping through a
+    // queue used to fetch one for every track passed over.
+    if (!(await WaitForTrackToSettle(uri))) {
+        return undefined;
     }
 
     const url = `https://spclient.wg.spotify.com/audio-attributes/v1/audio-analysis/${trackId}?format=json`;

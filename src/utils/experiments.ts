@@ -64,6 +64,13 @@ export const EXPERIMENTS = [
     default: true,
     pageClass: "Exp_LyricsSkeleton",
   },
+  {
+    id: "requestPacing",
+    label: "Request Pacing While Skipping",
+    description:
+      "Waits until you settle on a song before downloading its lyrics, so skipping through songs quickly doesn't hit the \"going a little fast\" limit. The wait follows how fast you skip, and there is none while you're just listening. Disable to request lyrics the moment the song changes.",
+    default: true,
+  },
 ] as const satisfies readonly Experiment[];
 
 /** A registry entry, narrowed to its literal `id` — what the UI iterates over. */
@@ -95,7 +102,8 @@ export function setExperiment(id: ExperimentId, value: boolean): void {
 /** Sync every experiment's `pageClass` onto the page root. Safe to call anytime. */
 export function ApplyExperimentClasses(el: HTMLElement): void {
   for (const exp of EXPERIMENTS) {
-    if (!exp.pageClass) continue;
+    // `in` narrows the registry's union to the entries that declare one.
+    if (!("pageClass" in exp) || !exp.pageClass) continue;
     el.classList.toggle(exp.pageClass, isExperimentEnabled(exp.id));
   }
 }
