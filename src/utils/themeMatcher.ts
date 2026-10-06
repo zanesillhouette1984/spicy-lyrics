@@ -31,8 +31,16 @@ export function watchMarketplaceUserCss(): () => void {
   const emit = (userCssText: string | null) =>
     onMarketplaceUserCssDetected(userCssText);
 
-  const getMarketplaceUserCssEl = () =>
-    document.body?.querySelector(":scope > .marketplaceUserCSS") ?? null;
+  // Only ever a direct child of <body>, so only body's children are looked at:
+  // a querySelector here searched the whole document on every mutation.
+  const getMarketplaceUserCssEl = (): Element | null => {
+    const children = document.body?.children;
+    if (!children) return null;
+    for (const child of children) {
+      if (child.classList.contains("marketplaceUserCSS")) return child;
+    }
+    return null;
+  };
 
   const detachCssObserver = () => {
     cssObserver?.disconnect();
@@ -85,8 +93,11 @@ export function watchMarketplaceUserCss(): () => void {
     }
   };
 
+  // Its own contents are covered by cssObserver; finding it only takes body's
+  // own child list. A subtree observer here ran sync() after every DOM change
+  // anywhere, lyrics line changes included.
   const bodyObserver = new MutationObserver(sync);
-  bodyObserver.observe(document.body, { childList: true, subtree: true });
+  bodyObserver.observe(document.body, { childList: true });
 
   // Initial sync (handles already-present element)
   sync();

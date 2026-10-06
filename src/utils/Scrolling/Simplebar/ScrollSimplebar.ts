@@ -6,7 +6,7 @@ import {
   LyricsPageMouseLeave,
   SetIsMouseInLyricsPage,
 } from "../Page/IsHovering.ts";
-import { PageContainer } from "../../../components/Pages/PageView.ts";
+import { GetLyricsContent, PageContainer } from "../../../components/Pages/PageView.ts";
 
 export let ScrollSimplebar: any | null = null;
 
@@ -56,11 +56,9 @@ export function RecalculateScrollSimplebar() {
 }
 
 new IntervalManager(Infinity, () => {
-  if (!PageContainer) return;
-  const LyricsContainer = PageContainer.querySelector<HTMLElement>(
-    ".LyricsContainer .LyricsContent"
-  );
-  if (!LyricsContainer || !ScrollSimplebar) return;
+  if (!ScrollSimplebar) return;
+  const LyricsContainer = GetLyricsContent();
+  if (!LyricsContainer) return;
   const hide = !IsMouseInLyricsPage && !ScrollSimplebar.isDragging;
   // Unguarded add/remove would queue a MutationObserver record every frame.
   if (LyricsContainer.classList.contains("hide-scrollbar") !== hide) {

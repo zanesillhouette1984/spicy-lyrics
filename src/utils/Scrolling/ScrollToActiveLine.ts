@@ -7,7 +7,7 @@ import {
 } from "../../utils/stores.ts";
 import Global from "../../components/Global/Global.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
-import { PageContainer } from "../../components/Pages/PageView.ts";
+import { GetLyricsContent, PageContainer } from "../../components/Pages/PageView.ts";
 import { IsCompactMode } from "../../components/Utils/CompactMode.ts";
 import { IsPIP } from "../../components/Utils/PopupLyrics.ts";
 import {
@@ -508,9 +508,7 @@ export function ScrollToActiveLine(ScrollSimplebar: any) {
         isUserScrolling = false;
         // Remove HideLineBlur class ONLY if we were user scrolling
         //if (wasUserScrolling) {
-        const lyricsContent = PageContainer?.querySelector(
-          ".LyricsContainer .LyricsContent"
-        );
+        const lyricsContent = GetLyricsContent();
         if (lyricsContent) {
           if (lyricsContent.classList.contains("HideLineBlur")) {
             lyricsContent.classList.remove("HideLineBlur");

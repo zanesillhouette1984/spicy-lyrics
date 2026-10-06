@@ -120,8 +120,19 @@ export const $spicyLyricsVersion = atom<string>(
   (window as any)._spicy_lyrics_metadata?.LoadedVersion ?? ProjectVersion
 );
 
+/**
+ * For atoms read every frame. nanostores' get() on a store nothing listens to
+ * subscribes and unsubscribes on every call, allocating two closures and
+ * splicing its listener list each time; with one permanent listener it is a
+ * plain read.
+ */
+function readEveryFrame<S extends { listen: (listener: () => void) => unknown }>(store: S): S {
+  store.listen(() => {});
+  return store;
+}
+
 // Runtime (ephemeral) atoms
-export const $currentLyricsType = atom<string>("None");
-export const $lyricsContainerExists = atom<boolean>(false);
+export const $currentLyricsType = readEveryFrame(atom<string>("None"));
+export const $lyricsContainerExists = readEveryFrame(atom<boolean>(false));
 export const $currentlyFetching = atom<boolean>(false);
 export const $currentLyricsData = atom<string>("");

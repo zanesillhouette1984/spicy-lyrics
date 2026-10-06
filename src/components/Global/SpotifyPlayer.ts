@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createTooltip } from "../../utils/tooltip.ts";
+import { IsOwnMutation } from "../../utils/OwnMutations.ts";
 import Global from "./Global.ts";
 import GetProgress, {
   _DEPRECATED___GetProgress,
@@ -356,11 +357,13 @@ export const SpotifyPlayer = {
       Global.Event.evoke("playbar:controls", rightContainer);
     }
 
+    // Watches the whole document, so our own lyrics rows go first: the check
+    // after it searches every added and removed subtree for the controls.
     const playbarObserver = new MutationObserver(records => {
-      if (records.some(record => record.target === rightContainer ||
+      if (records.some(record => !IsOwnMutation(record) && (record.target === rightContainer ||
         [...record.addedNodes, ...record.removedNodes].some(node => node instanceof Element &&
           (node === rightContainer || (rightContainer !== null && node.contains(rightContainer)) ||
-            node.matches(controlsSelector) || node.querySelector(controlsSelector))))) mountButtons();
+            node.matches(controlsSelector) || node.querySelector(controlsSelector)))))) mountButtons();
     });
     playbarObserver.observe(document.documentElement, { childList: true, subtree: true });
     mountButtons();

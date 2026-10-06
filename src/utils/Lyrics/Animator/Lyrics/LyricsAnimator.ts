@@ -981,6 +981,28 @@ export function Animate(position: number): void {
 
           if (isLetterGroup && word.Letters) {
             if (wordState === "Active") {
+              // The active letter is the same for every letter in the word, so
+              // find it once rather than rescanning the word for each letter.
+              let activeLetterIndex = -1;
+              let activeLetterPercentage = 0;
+              for (let i = 0; i < word.Letters.length; i++) {
+                if (
+                  getElementState(
+                    ProcessedPosition,
+                    word.Letters[i].StartTime,
+                    word.Letters[i].EndTime
+                  ) === "Active"
+                ) {
+                  activeLetterIndex = i;
+                  activeLetterPercentage = getProgressPercentage(
+                    ProcessedPosition,
+                    word.Letters[i].StartTime,
+                    word.Letters[i].EndTime
+                  );
+                  break;
+                }
+              }
+
               for (let k = 0; k < word.Letters.length; k++) {
                 const letter = word.Letters[k];
 
@@ -995,29 +1017,6 @@ export function Animate(position: number): void {
                   targetYOffset: number,
                   targetGlow: number,
                   targetGradient: number;
-
-                // Find active letter info (needed only for Active state calculation)
-                let activeLetterIndex = -1;
-                let activeLetterPercentage = 0;
-                if (wordState === "Active" && word.Letters) {
-                  for (let i = 0; i < word.Letters.length; i++) {
-                    if (
-                      getElementState(
-                        ProcessedPosition,
-                        word.Letters[i].StartTime,
-                        word.Letters[i].EndTime
-                      ) === "Active"
-                    ) {
-                      activeLetterIndex = i;
-                      activeLetterPercentage = getProgressPercentage(
-                        ProcessedPosition,
-                        word.Letters[i].StartTime,
-                        word.Letters[i].EndTime
-                      );
-                      break;
-                    }
-                  }
-                }
 
                 // Determine initial targets based on word state
                 // wordState is Active - Default to resting, then apply proximity-based animation

@@ -135,6 +135,29 @@ let PageResizeListener: ResizeObserver | null = null;
 export let PageContainer: HTMLElement | null = null;
 export let IsCardMode = false;
 
+let lyricsContentCache: { page: HTMLElement; element: HTMLElement | null } | null = null;
+
+/**
+ * The page's `.LyricsContent`. It is created with the page and lives exactly as
+ * long, so the loops that need it every frame look it up once per page instead
+ * of querying the page each time.
+ */
+export function GetLyricsContent(): HTMLElement | null {
+  const page = PageContainer;
+  if (!page) {
+    // Don't keep a destroyed page's DOM alive until the next one opens.
+    lyricsContentCache = null;
+    return null;
+  }
+  if (lyricsContentCache?.page !== page) {
+    lyricsContentCache = {
+      page,
+      element: page.querySelector<HTMLElement>(".LyricsContainer .LyricsContent"),
+    };
+  }
+  return lyricsContentCache.element;
+}
+
 async function OpenPage(
   AppendTo: HTMLElement | undefined = undefined,
   options?: { cardMode?: boolean }

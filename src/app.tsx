@@ -66,6 +66,7 @@ import Whentil from "./modules/Whentil.ts";
 import App from "./utils/app.ts";
 import { initSession } from "./utils/SessionManager/index.ts";
 import { jitter } from "./utils/jitter.ts";
+import { IsOwnMutation } from "./utils/OwnMutations.ts";
 
 async function main() {
   const appLogger = new Logger("App");
@@ -648,13 +649,18 @@ async function main() {
       // Initial check (covers late observer start scenarios).
       checkCinemaViewAndMaybeCleanup(topContainer);
 
-      cinemaViewObserver = new MutationObserver(() => {
+      cinemaViewObserver = new MutationObserver((records) => {
         if (!topContainer.isConnected) {
           cinemaViewObserver?.disconnect();
           cinemaViewObserver = null;
           cinemaViewActive = false;
           return;
         }
+
+        // The lyrics page and the NPV card both sit under the top container,
+        // and the check below searches all of it. Their rows mounting on each
+        // line change can't add or remove the cinema view.
+        if (records.every(IsOwnMutation)) return;
 
         checkCinemaViewAndMaybeCleanup(topContainer);
 

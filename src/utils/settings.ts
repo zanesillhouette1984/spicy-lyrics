@@ -4,6 +4,7 @@ import { flushSync } from "react-dom";
 import { PopupModal } from "../components/Modal.ts";
 import SettingsPanel from "../components/ReactComponents/SettingsPanel/index.tsx";
 import ExperimentsPanel from "../components/ReactComponents/SettingsPanel/ExperimentsPanel.tsx";
+import { IsOwnMutation } from "./OwnMutations.ts";
 
 const MODAL_ID = "settingsPanel";
 
@@ -128,6 +129,7 @@ export function registerSettingsMenu(icon: string) {
   // Spotify replaces menu contents after opening; ignore unrelated lyric mutations.
   new MutationObserver(records => {
     if (records.some(record => {
+      if (IsOwnMutation(record)) return false;
       const target = record.target;
       if (target instanceof Element && (target.matches(profileSelector) || target.closest("#context-menu"))) return true;
       return [...record.addedNodes, ...record.removedNodes].some(node =>
